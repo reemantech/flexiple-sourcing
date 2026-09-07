@@ -19,7 +19,8 @@ npm run dev
 Open http://localhost:3000.
 
 **Environment variable:** `GROQ_API_KEY` (get a free one at https://console.groq.com/keys).
-Optional: `GROQ_MODEL` (defaults to `llama-3.3-70b-versatile`).
+Optional: `GROQ_MODEL` (defaults to `openai/gpt-oss-120b` - Groq's recommended
+replacement after `llama-3.3-70b-versatile` was decommissioned in Aug 2026).
 
 The app makes real, server-side calls to the Groq API on every generate/score/refine
 step - nothing is mocked or canned. No login, no persistence: refresh and the session
@@ -38,9 +39,20 @@ is gone, by design (out of scope per the brief).
    junior, 2 and 4 are right"), plus the current filters/rubric and the profiles just
    shown, go back to the LLM, which returns *updated* filters/rubric and a one-line
    `change_summary` explaining what it changed and why. This repeats - each round's
-   feedback and change summary is kept in a visible log.
-5. **Freeze** - a client-side state transition (no API call): locks in the current
-   filters, rubric, and ranked shortlist as the final state.
+   feedback and change summary is kept in a visible, always-on history panel. The
+   filters/rubric panel and previous results stay visible (dimmed, locked) while a
+   round is processing - no full-page reload or loading-screen takeover.
+5. **Apply filter changes** (`app/api/rescore/route.ts`) - the recruiter can also edit
+   filters (skills, years, location, company type) directly in the panel and click
+   "Apply filter changes" to re-run local filtering and LLM scoring immediately against
+   their exact edits. This skips the LLM's own interpretation entirely - useful when the
+   recruiter knows precisely what they want changed rather than describing it as
+   feedback. The feedback box and this button are two distinct actions: feedback goes
+   through the LLM (which can also revise the rubric, not just filters); direct edits
+   are applied verbatim.
+6. **Freeze** - a client-side state transition (no API call): locks in the current
+   filters, rubric, and ranked shortlist as the final state, with a "Save as PDF" export
+   (via the browser's native print-to-PDF) and a "Start a new search" reset.
 
 All state (query, filters, rubric, results, round history) lives in React state on the
 client and is passed back to the API on each request - there's no database and no
@@ -55,36 +67,9 @@ JSON output, validated against Zod schemas (`lib/schemas.ts`) before use.
 ## Failure handling
 
 `lib/llm.ts` wraps every LLM call: 20s timeout per attempt, JSON-mode requested from the
-API, one automatic retry with a stricter reminder if the response fails Zod validation,
-and typed errors (`auth` / `rate_limit` / `timeout` / `invalid_output` / `unknown`) that
-map to a designed error screen (`components/ErrorState.tsx`) with a retry button -
-never a raw crash or stack trace. Empty result sets (filters match nobody) get their own
-designed empty state rather than a blank list.
-
-## Decisions - what I prioritized, what I cut, and why
-
-**Prioritized:**
-- Getting the full loop working end-to-end with real LLM calls over polishing any single
-  step - a recruiter needs to see the whole flow trusted, not one perfect screen.
-- Explanations that cite real profile fields (company, title, skill, years) rather than
-  generic praise - this was called out explicitly as a trust signal in the brief, and is
-  enforced in the scoring prompt.
-- A visible, plain-language change log on refinement ("Round 2: raised min years to 5
-  because...") so the recruiter can trust why results changed, not just that they did.
-- Designed failure and empty states, since the brief explicitly grades this - a missing
-  API key or a malformed LLM response shows a clear message and retry, not a crash.
-- An editable filters/rubric panel, always visible, matching the brief's described flow.
-
-**Cut / simplified, given the 3-hour box:**
-- Per-profile yes/no buttons - free-text feedback in a single input covers the required
-  flow (the brief explicitly allows either) and was faster to build well than a second
-  parallel interaction pattern.
-- Streaming responses - a single "thinking" state with a staged label was enough to make
-  waiting feel intentional without adding streaming complexity to every route.
-- Manually editing filters/rubric in the side panel doesn't auto-re-run the search on
-  every keystroke - you refine via the feedback box, which re-scores. Live re-filtering
-  on manual edits was judged lower value than the refinement loop itself for the time
-  available.
-- Multi-provider LLM fallback - the brief allows any single free-tier provider; used
-  Groq for low latency (matters when demoing a "thinking" loop live) and didn't build a
-  second provider as a fallback.
+API, and one automatic retry with a stricter reminder on either kind of malformed output
+we've seen in practice - a response that fails our own Zod validation, or Groq's own
+JSON-mode decoder rejecting the request outright with a `json_validate_failed` error
+before we even see a completion (hit this for real during testing; the fix treats both
+cases identically rather than only catching the one we anticipated up front). Typed
+errors (`auth` / `rate_limit` / `timeout` / `invalid_output` /
