@@ -35,12 +35,16 @@ export default function SpecPanel({
   totalMatched,
   onChangeFilters,
   onChangeRubric,
+  onApplyFilters,
+  applyDisabled,
 }: {
   filters: Filters;
   rubric: Rubric;
   totalMatched: number;
   onChangeFilters: (f: Filters) => void;
   onChangeRubric: (r: Rubric) => void;
+  onApplyFilters: () => void;
+  applyDisabled: boolean;
 }) {
   return (
     <div className="space-y-6">
@@ -96,7 +100,7 @@ export default function SpecPanel({
                   })
                 }
                 placeholder="max"
-                className="w-14 bg-transparent text-sm outline-none border-b border-transparent hover:border-[var(--border)] focus:border-[var(--primary)] py-0.5"
+                className="w-14 bg-transparent text-sm outline-none border-b border-transparent hover:border-[var(--primary)] py-0.5"
               />
               <span className="text-[var(--ink-muted)] text-xs">years</span>
             </dd>
@@ -140,6 +144,14 @@ export default function SpecPanel({
           </div>
         </dl>
       </div>
+
+      <button
+        onClick={onApplyFilters}
+        disabled={applyDisabled}
+        className="w-full text-sm font-medium px-3 py-2 rounded border border-[var(--border)] hover:border-[var(--primary)] hover:text-[var(--primary)] disabled:opacity-30 transition-colors"
+      >
+        Apply filter changes
+      </button>
 
       <div className="border-t border-[var(--border)] pt-5">
         <h2 className="text-sm font-semibold mb-2">Fit rubric</h2>

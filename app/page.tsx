@@ -227,6 +227,8 @@ export default function Page() {
             totalMatched={state.totalMatched}
             onChangeFilters={(f) => updateFilters(state, f)}
             onChangeRubric={(r) => updateRubric(state, r)}
+            onApplyFilters={() => runApplyFilters(state)}
+            applyDisabled={isRefining}
           />
         </div>
         <button
